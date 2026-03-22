@@ -102,6 +102,8 @@ All API routes return JSON:
 
 Create keys under **Settings → API Keys**. Authenticate with `Authorization: Bearer <key>`.
 
+📖 **[Simple API Setup Guide](docs/API-SETUP.md)** — step-by-step instructions anyone can follow.
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/api/agent/auth/validate` | Validate API key |

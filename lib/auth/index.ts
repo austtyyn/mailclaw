@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
 export async function getUser() {
@@ -47,7 +47,11 @@ export async function getOrCreateDefaultWorkspace(userId: string) {
     return workspace as { id: string; name: string };
   }
 
-  const { data: workspace, error } = await supabase
+  // Use service role to create workspace: RLS insert can fail when auth.uid()
+  // isn't available in server context (e.g. cookie/session propagation). The
+  // userId is validated by requireAuth() before this runs.
+  const admin = await createServiceRoleClient();
+  const { data: workspace, error } = await admin
     .from("workspaces")
     .insert({ name: "Default Workspace", owner_user_id: userId })
     .select("id, name")

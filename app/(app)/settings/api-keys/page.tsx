@@ -28,6 +28,12 @@ export default async function ApiKeysPage() {
           Use these keys to authenticate external systems (e.g. OpenClaw). All
           requests require a Bearer token in the Authorization header.
         </p>
+        <a
+          href="/docs/api-setup"
+          className="inline-block text-blue-400 hover:text-blue-300 text-sm mb-4"
+        >
+          📖 Simple setup guide →
+        </a>
         <ul className="text-sm text-slate-400 space-y-1 list-disc list-inside">
           <li>
             <code className="text-slate-300">POST /api/agent/auth/validate</code>{" "}

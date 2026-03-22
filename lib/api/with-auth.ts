@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isRedirectError } from "next/dist/client/components/redirect";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { requireAuth } from "@/lib/auth";
 import { getOrCreateDefaultWorkspace } from "@/lib/auth";
 import { fromError } from "./responses";

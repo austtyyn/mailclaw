@@ -20,7 +20,7 @@ export function isValidWarmupStatus(s: string): s is (typeof WARMUP_STATUSES)[nu
 
 export function isValidDateString(s: string): boolean {
   const d = new Date(s);
-  return !isNaN(d.getTime()) && s.match(/^\d{4}-\d{2}-\d{2}$/);
+  return !isNaN(d.getTime()) && /^\d{4}-\d{2}-\d{2}$/.test(s);
 }
 
 export function isValidUuid(s: string): boolean {
