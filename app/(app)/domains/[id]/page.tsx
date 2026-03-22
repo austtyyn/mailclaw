@@ -125,7 +125,7 @@ export default async function DomainDetailPage({
           <h2 className="font-medium mb-3">Issues & Recommendations</h2>
           {issues.length > 0 ? (
             <ul className="space-y-1 text-sm text-amber-400 mb-3">
-              {issues.map((i, idx) => (
+              {issues.map((i: string, idx: number) => (
                 <li key={idx}>• {i}</li>
               ))}
             </ul>
@@ -134,7 +134,7 @@ export default async function DomainDetailPage({
           )}
           {recommendations.length > 0 ? (
             <ul className="space-y-1 text-sm text-slate-400">
-              {recommendations.map((r, idx) => (
+              {recommendations.map((r: string, idx: number) => (
                 <li key={idx}>• {r}</li>
               ))}
             </ul>

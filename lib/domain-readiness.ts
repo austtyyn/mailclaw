@@ -17,7 +17,7 @@ export interface DomainReadiness {
   health_status: string;
 }
 
-interface DomainInput {
+export interface DomainInput {
   spf_status: DnsStatus | null;
   dkim_status: DnsStatus | null;
   dmarc_status: DnsStatus | null;
