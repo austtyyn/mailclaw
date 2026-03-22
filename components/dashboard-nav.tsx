@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/onboarding", label: "Setup" },
   { href: "/domains", label: "Domains" },
   { href: "/mailboxes", label: "Mailboxes" },
   { href: "/warmup", label: "Warmup" },
@@ -26,7 +27,7 @@ export function DashboardNav() {
       <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-14">
         <div className="flex items-center gap-8">
           <Link href="/dashboard" className="font-semibold text-white">
-            MailForge
+            MailClaw
           </Link>
           <div className="flex gap-6">
             {navItems.map((item) => {

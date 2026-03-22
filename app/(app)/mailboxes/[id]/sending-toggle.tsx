@@ -6,18 +6,22 @@ import { useRouter } from "next/navigation";
 export function SendingToggle({
   mailboxId,
   sendingEnabled,
-  domainVerified,
+  domainCanSend,
+  denialReasons = [],
 }: {
   mailboxId: string;
   sendingEnabled: boolean;
-  domainVerified: boolean;
+  domainCanSend: boolean;
+  denialReasons?: string[];
 }) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   async function handleToggle() {
-    if (!domainVerified && !sendingEnabled) return;
+    if (!domainCanSend && !sendingEnabled) return;
     setLoading(true);
+    setError(null);
 
     const res = await fetch(`/api/mailboxes/${mailboxId}`, {
       method: "PATCH",
@@ -25,20 +29,26 @@ export function SendingToggle({
       body: JSON.stringify({ sending_enabled: !sendingEnabled }),
     });
 
+    const data = await res.json().catch(() => ({}));
     setLoading(false);
-    if (res.ok) router.refresh();
+    if (res.ok) {
+      router.refresh();
+    } else {
+      setError(data.error ?? "Failed to update");
+    }
   }
 
-  const canEnable = domainVerified;
+  const canEnable = domainCanSend;
   const disabled = loading || (!sendingEnabled && !canEnable);
 
   return (
-    <div className="flex items-center gap-2">
-      {!domainVerified && (
-        <span className="text-amber-400 text-sm">
-          Verify domain to enable sending
+    <div className="flex flex-col gap-1 items-end">
+      {!domainCanSend && !sendingEnabled && (
+        <span className="text-amber-400 text-sm" title={denialReasons.join("; ")}>
+          {denialReasons[0] ?? "Domain not ready for sending"}
         </span>
       )}
+      {error && <span className="text-red-400 text-sm">{error}</span>}
       <button
         onClick={handleToggle}
         disabled={disabled}

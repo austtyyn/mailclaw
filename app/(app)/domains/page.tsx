@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getOrCreateDefaultWorkspace } from "@/lib/auth";
 import { requireAuth } from "@/lib/auth";
+import { evaluateDomainReadiness } from "@/lib/domain-readiness";
 import { AddDomainForm } from "./add-domain-form";
 
 function StatusBadge({ status }: { status: string }) {
@@ -31,6 +32,32 @@ function DnsBadge({ status }: { status: string }) {
   return (
     <span className={`text-xs ${colors[status] ?? "text-slate-500"}`}>
       {status}
+    </span>
+  );
+}
+
+function ReadinessBadge({
+  canSend,
+  canWarmup,
+}: {
+  canSend: boolean;
+  canWarmup: boolean;
+}) {
+  if (canSend)
+    return (
+      <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-400">
+        Ready
+      </span>
+    );
+  if (canWarmup)
+    return (
+      <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-500/20 text-amber-400">
+        Warmup only
+      </span>
+    );
+  return (
+    <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-400">
+      Not ready
     </span>
   );
 }
@@ -73,6 +100,9 @@ export default async function DomainsPage() {
                 DMARC
               </th>
               <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">
+                Readiness
+              </th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">
                 Health
               </th>
               <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">
@@ -82,42 +112,56 @@ export default async function DomainsPage() {
           </thead>
           <tbody>
             {domains?.length ? (
-              domains.map((d) => (
-                <tr
-                  key={d.id}
-                  className="border-b border-slate-700/50 hover:bg-slate-800/30"
-                >
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/domains/${d.id}`}
-                      className="text-blue-400 hover:underline"
-                    >
-                      {d.domain}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={d.status} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <DnsBadge status={d.spf_status} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <DnsBadge status={d.dkim_status} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <DnsBadge status={d.dmarc_status} />
-                  </td>
-                  <td className="px-4 py-3">{d.health_score}</td>
-                  <td className="px-4 py-3 text-slate-500 text-sm">
-                    {d.dns_last_checked_at
-                      ? new Date(d.dns_last_checked_at).toLocaleString()
-                      : "—"}
-                  </td>
-                </tr>
-              ))
+              domains.map((d) => {
+                const readiness = evaluateDomainReadiness({
+                  spf_status: d.spf_status,
+                  dkim_status: d.dkim_status,
+                  dmarc_status: d.dmarc_status,
+                  health_score: d.health_score,
+                });
+                return (
+                  <tr
+                    key={d.id}
+                    className="border-b border-slate-700/50 hover:bg-slate-800/30"
+                  >
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/domains/${d.id}`}
+                        className="text-blue-400 hover:underline"
+                      >
+                        {d.domain}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge status={d.status} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <DnsBadge status={d.spf_status} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <DnsBadge status={d.dkim_status} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <DnsBadge status={d.dmarc_status} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <ReadinessBadge
+                        canSend={readiness.can_send}
+                        canWarmup={readiness.can_warmup}
+                      />
+                    </td>
+                    <td className="px-4 py-3">{d.health_score}</td>
+                    <td className="px-4 py-3 text-slate-500 text-sm">
+                      {d.dns_last_checked_at
+                        ? new Date(d.dns_last_checked_at).toLocaleString()
+                        : "—"}
+                    </td>
+                  </tr>
+                );
+              })
             ) : (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
                   No domains yet. Add one to get started.
                 </td>
               </tr>

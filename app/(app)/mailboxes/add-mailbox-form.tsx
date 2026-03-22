@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ALLOWED_PROVIDERS } from "@/lib/api/constants";
 
 interface Domain {
   id: string;
@@ -83,13 +84,17 @@ export function AddMailboxForm({ domains }: { domains: Domain[] }) {
       </div>
       <div>
         <label className="block text-xs text-slate-500 mb-1">Provider</label>
-        <input
-          type="text"
+        <select
           value={provider}
           onChange={(e) => setProvider(e.target.value)}
-          placeholder="manual"
-          className="px-4 py-2 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 w-24"
-        />
+          className="px-4 py-2 rounded-lg bg-slate-800 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          {ALLOWED_PROVIDERS.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </select>
       </div>
       <button
         type="submit"

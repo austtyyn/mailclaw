@@ -1,8 +1,12 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { withAuth } from "@/lib/api/with-auth";
-import { isValidEmail, isValidUuid } from "@/lib/validation";
-import { PROVIDER_MAX_LENGTH, PROVIDER_ACCOUNT_REF_MAX_LENGTH } from "@/lib/api/constants";
+import { isValidEmail, isValidUuid, isValidProvider } from "@/lib/validation";
+import {
+  PROVIDER_MAX_LENGTH,
+  PROVIDER_ACCOUNT_REF_MAX_LENGTH,
+  ALLOWED_PROVIDERS,
+} from "@/lib/api/constants";
 import * as res from "@/lib/api/responses";
 
 export const GET = (request: NextRequest) =>
@@ -39,7 +43,16 @@ export const POST = (request: NextRequest) =>
     const body = await request.json().catch(() => ({}));
     const email = String(body?.email ?? "").trim().toLowerCase();
     const domainId = String(body?.domain_id ?? "");
-    const provider = String(body?.provider ?? "manual").slice(0, PROVIDER_MAX_LENGTH);
+    const providerRaw = String(body?.provider ?? "manual")
+      .trim()
+      .toLowerCase()
+      .slice(0, PROVIDER_MAX_LENGTH);
+    if (!isValidProvider(providerRaw, ALLOWED_PROVIDERS)) {
+      return res.badRequest(
+        `Provider must be one of: ${ALLOWED_PROVIDERS.join(", ")}`
+      );
+    }
+    const provider = providerRaw;
     const providerAccountRef = body?.provider_account_ref
       ? String(body.provider_account_ref).slice(0, PROVIDER_ACCOUNT_REF_MAX_LENGTH)
       : null;

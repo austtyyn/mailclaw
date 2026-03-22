@@ -9,14 +9,14 @@ export default async function HomePage() {
   } = await supabase.auth.getUser();
 
   if (user) {
-    redirect("/dashboard");
+    redirect("/onboarding");
   }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4">
       <div className="text-center max-w-lg">
         <h1 className="text-4xl font-bold tracking-tight text-white mb-2">
-          MailForge
+          MailClaw
         </h1>
         <p className="text-slate-400 mb-8">
           Deliverability and warmup infrastructure for AI agents and automated

@@ -1,7 +1,5 @@
 import { NextRequest } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { validateApiKey } from "@/lib/agent";
-import { scoreToStatus } from "@/lib/health";
+import { validateApiKey, getDomainHealthSummary } from "@/lib/agent";
 import { isValidUuid } from "@/lib/validation";
 import * as res from "@/lib/api/responses";
 
@@ -19,38 +17,14 @@ export async function GET(request: NextRequest) {
     return res.badRequest("Invalid domain_id");
   }
 
-  const supabase = await createServiceRoleClient();
+  const { domains } = await getDomainHealthSummary(
+    result.context.workspaceId,
+    domainId ?? undefined
+  );
 
-  let query = supabase
-    .from("domains")
-    .select(
-      "id, domain, status, spf_status, dkim_status, dmarc_status, health_score, dns_last_checked_at"
-    )
-    .eq("workspace_id", result.context.workspaceId);
-
-  if (domainId) query = query.eq("id", domainId);
-
-  const { data: domains, error } = await query;
-
-  if (error) return res.serverError(error.message);
-
-  const healthSummaries = (domains ?? []).map((d) => ({
-    domain_id: d.id,
-    domain: d.domain,
-    status: d.status,
-    health_score: d.health_score,
-    health_status: scoreToStatus(d.health_score),
-    authentication: {
-      spf: d.spf_status,
-      dkim: d.dkim_status,
-      dmarc: d.dmarc_status,
-    },
-    dns_last_checked_at: d.dns_last_checked_at,
-  }));
-
-  if (domainId && healthSummaries.length === 0) {
+  if (domainId && domains.length === 0) {
     return res.notFound("Domain not found");
   }
 
-  return res.ok({ domains: healthSummaries });
+  return res.ok({ domains });
 }

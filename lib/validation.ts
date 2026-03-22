@@ -26,3 +26,10 @@ export function isValidDateString(s: string): boolean {
 export function isValidUuid(s: string): boolean {
   return UUID_REGEX.test(s);
 }
+
+export function isValidProvider(
+  s: string,
+  allowed: readonly string[]
+): boolean {
+  return allowed.includes(s.toLowerCase());
+}

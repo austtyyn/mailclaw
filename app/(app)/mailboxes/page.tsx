@@ -1,14 +1,18 @@
 import Link from "next/link";
 import { unwrapRelation } from "@/lib/utils";
+import { getTodayStart } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
 import { getOrCreateDefaultWorkspace } from "@/lib/auth";
 import { requireAuth } from "@/lib/auth";
+import { evaluateMailboxEligibility } from "@/lib/mailbox-eligibility";
+import { scoreToStatus } from "@/lib/health";
 import { AddMailboxForm } from "./add-mailbox-form";
 
 export default async function MailboxesPage() {
   const user = await requireAuth();
   const workspace = await getOrCreateDefaultWorkspace(user.id);
   const supabase = await createClient();
+  const todayStart = getTodayStart();
 
   const { data: mailboxes } = await supabase
     .from("mailboxes")
@@ -16,11 +20,26 @@ export default async function MailboxesPage() {
       *,
       domains (
         id,
-        domain
+        domain,
+        spf_status,
+        dkim_status,
+        dmarc_status,
+        health_score
       )
     `)
     .eq("workspace_id", workspace.id)
     .order("created_at", { ascending: false });
+
+  const { data: todayMessages } = await supabase
+    .from("messages")
+    .select("mailbox_id")
+    .eq("direction", "outbound")
+    .gte("created_at", todayStart);
+
+  const outboundByMailbox = new Map<string, number>();
+  for (const m of todayMessages ?? []) {
+    outboundByMailbox.set(m.mailbox_id, (outboundByMailbox.get(m.mailbox_id) ?? 0) + 1);
+  }
 
   const { data: domains } = await supabase
     .from("domains")
@@ -57,6 +76,9 @@ export default async function MailboxesPage() {
                 Health
               </th>
               <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">
+                Eligible
+              </th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">
                 Sending
               </th>
             </tr>
@@ -65,6 +87,19 @@ export default async function MailboxesPage() {
             {mailboxes?.length ? (
               mailboxes.map((mb) => {
                 const domain = unwrapRelation(mb.domains);
+                const eligibility = evaluateMailboxEligibility(
+                  mb,
+                  domain
+                    ? {
+                        spf_status: domain.spf_status,
+                        dkim_status: domain.dkim_status,
+                        dmarc_status: domain.dmarc_status,
+                        health_score: domain.health_score,
+                      }
+                    : null,
+                  { outbound_count: outboundByMailbox.get(mb.id) ?? 0 }
+                );
+                const healthStatus = scoreToStatus(mb.health_score);
                 return (
                   <tr
                     key={mb.id}
@@ -95,9 +130,24 @@ export default async function MailboxesPage() {
                               ? "text-amber-400"
                               : "text-red-400"
                         }
+                        title={healthStatus}
                       >
-                        {mb.health_score}
+                        {mb.health_score} ({healthStatus})
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {eligibility.eligible_to_send ? (
+                        <span className="text-green-400 text-sm" title={`${eligibility.remaining_daily_capacity} left today`}>
+                          Yes ({eligibility.remaining_daily_capacity} left)
+                        </span>
+                      ) : (
+                        <span
+                          className="text-amber-400 text-sm"
+                          title={eligibility.denial_reasons.join("; ")}
+                        >
+                          No
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {mb.sending_enabled ? (
@@ -111,7 +161,7 @@ export default async function MailboxesPage() {
               })
             ) : (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
                   No mailboxes yet. Add one to get started.
                 </td>
               </tr>

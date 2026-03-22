@@ -10,14 +10,14 @@ export default async function SignInPage() {
   } = await supabase.auth.getUser();
 
   if (user) {
-    redirect("/dashboard");
+    redirect("/onboarding");
   }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4">
       <div className="w-full max-w-md">
         <Link href="/" className="block text-center text-2xl font-bold mb-6">
-          MailForge
+          MailClaw
         </Link>
         <SignInForm />
         <p className="mt-4 text-center text-slate-400 text-sm">

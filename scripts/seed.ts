@@ -14,7 +14,6 @@ if (!supabaseUrl || !supabaseServiceKey) {
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 async function seed() {
-  // Create a test user via Auth Admin if needed - for local dev, use existing user
   const { data: { users } } = await supabase.auth.admin.listUsers();
   const testUser = users?.[0];
   if (!testUser) {
@@ -48,19 +47,33 @@ async function seed() {
     workspaceId = workspace!.id;
   }
 
-  const { data: existingDomain } = await supabase
+  // --- Domains ---
+  // Good domain: ready for sending
+  const { data: goodDomain } = await supabase
     .from("domains")
     .select("id")
     .eq("workspace_id", workspaceId)
-    .limit(1)
+    .eq("domain", "example.com")
     .single();
 
-  let domainId: string;
-  if (existingDomain) {
-    domainId = existingDomain.id;
-    console.log("Using existing domain");
+  let goodDomainId: string;
+  if (goodDomain) {
+    goodDomainId = goodDomain.id;
+    await supabase
+      .from("domains")
+      .update({
+        status: "verified",
+        spf_status: "pass",
+        dkim_status: "pass",
+        dmarc_status: "pass",
+        health_score: 90,
+        dns_last_checked_at: new Date().toISOString(),
+        verification_issues: [],
+        verification_recommendations: [],
+      })
+      .eq("id", goodDomainId);
   } else {
-    const { data: domain, error: de } = await supabase
+    const { data: d, error: de } = await supabase
       .from("domains")
       .insert({
         workspace_id: workspaceId,
@@ -69,145 +82,209 @@ async function seed() {
         spf_status: "pass",
         dkim_status: "pass",
         dmarc_status: "pass",
-        health_score: 100,
+        health_score: 90,
         dns_last_checked_at: new Date().toISOString(),
+        verification_issues: [],
+        verification_recommendations: [],
       })
       .select("id")
       .single();
     if (de) {
-      console.error("Domain creation failed:", de);
+      console.error("Good domain creation failed:", de);
       process.exit(1);
     }
-    domainId = domain!.id;
+    goodDomainId = d!.id;
   }
 
-  const { data: mailboxes } = await supabase
-    .from("mailboxes")
+  // Partially misconfigured domain: SPF fail, DKIM unknown, DMARC fail
+  const { data: badDomain } = await supabase
+    .from("domains")
     .select("id")
+    .eq("workspace_id", workspaceId)
+    .eq("domain", "misconfigured.test")
+    .single();
+
+  let badDomainId: string;
+  if (badDomain) {
+    badDomainId = badDomain.id;
+    await supabase
+      .from("domains")
+      .update({
+        status: "failed",
+        spf_status: "fail",
+        dkim_status: "unknown",
+        dmarc_status: "fail",
+        health_score: 35,
+        verification_issues: [
+          "No SPF record found for domain",
+          "No DMARC record found at _dmarc subdomain",
+        ],
+        verification_recommendations: [
+          "Add an SPF TXT record at your domain root",
+          "Add a DMARC TXT record at _dmarc.yourdomain.com",
+        ],
+      })
+      .eq("id", badDomainId);
+  } else {
+    const { data: d, error: de } = await supabase
+      .from("domains")
+      .insert({
+        workspace_id: workspaceId,
+        domain: "misconfigured.test",
+        status: "failed",
+        spf_status: "fail",
+        dkim_status: "unknown",
+        dmarc_status: "fail",
+        health_score: 35,
+        dns_last_checked_at: new Date().toISOString(),
+        verification_issues: [
+          "No SPF record found for domain",
+          "No DMARC record found at _dmarc subdomain",
+        ],
+        verification_recommendations: [
+          "Add an SPF TXT record at your domain root",
+          "Add a DMARC TXT record at _dmarc.yourdomain.com",
+        ],
+      })
+      .select("id")
+      .single();
+    if (de) {
+      console.error("Bad domain creation failed (domain may exist elsewhere):", de.message);
+      badDomainId = goodDomainId;
+    } else {
+      badDomainId = d!.id;
+    }
+  }
+
+  // --- Mailboxes ---
+  const { data: existingMailboxes } = await supabase
+    .from("mailboxes")
+    .select("id, email")
     .eq("workspace_id", workspaceId);
 
   let mb1Id: string;
   let mb2Id: string;
+  let mb3Id: string;
 
-  if (mailboxes && mailboxes.length >= 2) {
-    mb1Id = mailboxes[0].id;
-    mb2Id = mailboxes[1].id;
-    console.log("Using existing mailboxes");
-  } else {
-    const emails = ["sender1@example.com", "sender2@example.com"];
-    const ids: string[] = [];
-    for (const email of emails) {
-      const { data: mb, error: me } = await supabase
+  const needed = [
+    { email: "sender1@example.com", domainId: goodDomainId, health: 85, sending: true },
+    { email: "sender2@misconfigured.test", domainId: badDomainId, health: 75, sending: true },
+    { email: "sender3@example.com", domainId: goodDomainId, health: 45, sending: false },
+  ];
+
+  const ids: string[] = [];
+  for (const n of needed) {
+    const existing = existingMailboxes?.find((m) => m.email === n.email);
+    if (existing) {
+      ids.push(existing.id);
+      await supabase
+        .from("mailboxes")
+        .update({
+          domain_id: n.domainId,
+          health_score: n.health,
+          sending_enabled: n.sending,
+          daily_limit: 20,
+          provider: "manual",
+        })
+        .eq("id", existing.id);
+    } else {
+      const { data: mb, error } = await supabase
         .from("mailboxes")
         .insert({
           workspace_id: workspaceId,
-          domain_id: domainId,
-          email,
+          domain_id: n.domainId,
+          email: n.email,
           provider: "manual",
-          warmup_status: "warming",
+          warmup_status: n.sending ? "warming" : "pending",
           daily_limit: 20,
-          health_score: 95,
-          sending_enabled: true,
+          health_score: n.health,
+          sending_enabled: n.sending,
         })
         .select("id")
         .single();
-      if (me) {
-        console.error("Mailbox creation failed:", me);
+      if (error) {
+        console.error("Mailbox creation failed:", n.email, error);
         continue;
       }
       ids.push(mb!.id);
     }
-    mb1Id = ids[0];
-    mb2Id = ids[1] ?? ids[0];
   }
 
+  mb1Id = ids[0];
+  mb2Id = ids[1] ?? ids[0];
+  mb3Id = ids[2] ?? ids[0];
+
+  // --- Warmup schedules ---
   const today = new Date();
   for (let i = 0; i < 7; i++) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
     const dateStr = d.toISOString().split("T")[0];
     const target = i === 0 ? 10 : 5;
-
     await supabase.from("warmup_schedules").upsert(
-      [
-        {
-          mailbox_id: mb1Id,
-          schedule_date: dateStr,
-          target_send_count: target,
-          actual_send_count: i < 2 ? target : 0,
-          stage: i < 3 ? "new" : "week1",
-          status: i === 0 ? "in_progress" : "completed",
-        },
-        {
-          mailbox_id: mb2Id,
-          schedule_date: dateStr,
-          target_send_count: target,
-          actual_send_count: Math.floor(target * 0.8),
-          stage: "week1",
-          status: "completed",
-        },
-      ],
+      [mb1Id, mb2Id, mb3Id].map((mailbox_id) => ({
+        mailbox_id,
+        schedule_date: dateStr,
+        target_send_count: target,
+        actual_send_count: i < 2 ? target : 0,
+        stage: i < 3 ? "new" : "week1",
+        status: i === 0 ? "in_progress" : "completed",
+      })),
       { onConflict: "mailbox_id,schedule_date" }
     );
   }
 
-  const { data: existingMessages } = await supabase
+  // --- Messages: mb1 has 3 outbound today (best-sender eligible, 17 left)
+  const todayStr = today.toISOString().split("T")[0] + "T00:00:00";
+  const { data: todayMessages } = await supabase
     .from("messages")
     .select("id")
     .eq("workspace_id", workspaceId)
-    .limit(1)
-    .single();
+    .eq("mailbox_id", mb1Id)
+    .eq("direction", "outbound")
+    .gte("created_at", todayStr);
 
-  if (!existingMessages) {
-    await supabase.from("messages").insert([
-      {
+  if (!todayMessages || todayMessages.length < 3) {
+    for (let i = 0; i < 3; i++) {
+      await supabase.from("messages").insert({
         workspace_id: workspaceId,
         mailbox_id: mb1Id,
-        external_message_id: "msg-1",
+        external_message_id: `seed-msg-${Date.now()}-${i}`,
         direction: "outbound",
-        subject: "Warmup test",
+        subject: `Warmup test ${i + 1}`,
         delivery_status: "delivered",
         sent_at: new Date().toISOString(),
-      },
-      {
-        workspace_id: workspaceId,
-        mailbox_id: mb1Id,
-        external_message_id: "msg-2",
-        direction: "outbound",
-        subject: "Warmup test 2",
-        delivery_status: "delivered",
-        sent_at: new Date().toISOString(),
-      },
-    ]);
-
-    const { data: msgs } = await supabase
-      .from("messages")
-      .select("id")
-      .eq("workspace_id", workspaceId)
-      .limit(2);
-
-    if (msgs?.length) {
-      await supabase.from("deliverability_events").insert([
-        { message_id: msgs[0].id, mailbox_id: mb1Id, event_type: "delivered", payload: {} },
-        { message_id: msgs[1].id, mailbox_id: mb1Id, event_type: "delivered", payload: {} },
-      ]);
-      await supabase
-        .from("deliverability_events")
-        .insert({
-          mailbox_id: mb2Id,
-          event_type: "sent",
-          payload: { subject: "Warmup day 1" },
-        });
-      await supabase
-        .from("deliverability_events")
-        .insert({
-          mailbox_id: mb2Id,
-          event_type: "reply",
-          payload: {},
-        });
+      });
     }
   }
 
+  // --- Deliverability events: healthy + bounces for variety
+  const { data: msgs } = await supabase
+    .from("messages")
+    .select("id, mailbox_id")
+    .eq("workspace_id", workspaceId)
+    .limit(5);
+
+  if (msgs?.length) {
+    const mb1Msgs = msgs.filter((m) => m.mailbox_id === mb1Id);
+    for (const m of mb1Msgs) {
+      await supabase
+        .from("deliverability_events")
+        .insert({ message_id: m.id, mailbox_id: mb1Id, event_type: "delivered", payload: {} });
+    }
+    await supabase.from("deliverability_events").insert({
+      mailbox_id: mb2Id,
+      event_type: "hard_bounce",
+      payload: { reason: "seed test" },
+    });
+    await supabase.from("deliverability_events").insert({
+      mailbox_id: mb3Id,
+      event_type: "soft_bounce",
+      payload: { reason: "seed test" },
+    });
+  }
+
+  // --- API key ---
   const { data: existingKeys } = await supabase
     .from("agent_api_keys")
     .select("id")
@@ -228,6 +305,11 @@ async function seed() {
   }
 
   console.log("Seed complete. Workspace:", workspaceId);
+  console.log("  - Good domain (example.com): ready for sending");
+  console.log("  - Bad domain (misconfigured.test): not ready");
+  console.log("  - sender1@example.com: healthy, eligible for best-sender");
+  console.log("  - sender2@misconfigured.test: send-permission denies (bad domain)");
+  console.log("  - sender3@example.com: restricted health, sending disabled");
 }
 
 seed().catch(console.error);

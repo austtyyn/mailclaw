@@ -1,9 +1,18 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { withAuth } from "@/lib/api/with-auth";
-import { isValidUuid, isValidWarmupStatus } from "@/lib/validation";
-import { DAILY_LIMIT_MIN, DAILY_LIMIT_MAX } from "@/lib/api/constants";
+import {
+  isValidUuid,
+  isValidWarmupStatus,
+  isValidProvider,
+} from "@/lib/validation";
+import {
+  DAILY_LIMIT_MIN,
+  DAILY_LIMIT_MAX,
+  ALLOWED_PROVIDERS,
+} from "@/lib/api/constants";
 import { unwrapRelation } from "@/lib/utils";
+import { evaluateDomainReadiness } from "@/lib/domain-readiness";
 import * as res from "@/lib/api/responses";
 
 export const PATCH = (
@@ -19,7 +28,7 @@ export const PATCH = (
 
     const { data: mailbox, error: fetchError } = await supabase
       .from("mailboxes")
-      .select(`*, domains (id, status)`)
+      .select(`*, domains (id, status, spf_status, dkim_status, dmarc_status, health_score)`)
       .eq("id", id)
       .eq("workspace_id", workspaceId)
       .single();
@@ -28,9 +37,16 @@ export const PATCH = (
 
     if (body.sending_enabled === true) {
       const domain = unwrapRelation(mailbox.domains);
-      if (!domain || domain.status !== "verified") {
+      const readiness = evaluateDomainReadiness({
+        spf_status: domain?.spf_status ?? null,
+        dkim_status: domain?.dkim_status ?? null,
+        dmarc_status: domain?.dmarc_status ?? null,
+        health_score: domain?.health_score ?? null,
+      });
+      if (!domain || !readiness.can_send) {
         return res.badRequest(
-          "Domain must be verified before enabling sending. Run domain verification first."
+          readiness.reasons[0] ??
+            "Domain must be verified before enabling sending. Run domain verification first."
         );
       }
     }
@@ -48,6 +64,15 @@ export const PATCH = (
     }
     if (typeof body.warmup_status === "string" && isValidWarmupStatus(body.warmup_status)) {
       updates.warmup_status = body.warmup_status;
+    }
+    if (typeof body.provider === "string") {
+      const providerRaw = body.provider.trim().toLowerCase().slice(0, 64);
+      if (!isValidProvider(providerRaw, ALLOWED_PROVIDERS)) {
+        return res.badRequest(
+          `Provider must be one of: ${ALLOWED_PROVIDERS.join(", ")}`
+        );
+      }
+      updates.provider = providerRaw;
     }
 
     if (Object.keys(updates).length === 0) {

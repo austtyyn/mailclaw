@@ -17,10 +17,16 @@ export async function POST(request: NextRequest) {
     return res.badRequest("mailbox_id is required");
   }
 
-  const { allowed, reason } = await checkSendPermission(
+  const permission = await checkSendPermission(
     result.context.workspaceId,
     mailboxId
   );
 
-  return res.ok({ allowed, reason });
+  return res.ok({
+    allow: permission.allow,
+    denial_reasons: permission.denial_reasons,
+    ...(permission.remaining_daily_capacity !== undefined && {
+      remaining_daily_capacity: permission.remaining_daily_capacity,
+    }),
+  });
 }

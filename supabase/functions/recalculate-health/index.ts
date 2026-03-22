@@ -6,8 +6,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const HARD_BOUNCE_PENALTY = 25;
-const SOFT_BOUNCE_PENALTY = 10;
+const HARD_BOUNCE_PENALTY = 20;
+const SOFT_BOUNCE_PENALTY = 5;
 const DELIVERED_BONUS = 1;
 const REPLY_BONUS = 2;
 const MIN_SCORE = 0;
