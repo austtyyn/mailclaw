@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
@@ -19,15 +20,24 @@ export function SignUpForm() {
     setLoading(true);
 
     const supabase = createClient();
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: {
+        data: { full_name: fullName },
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
+      },
     });
 
     setLoading(false);
     if (error) {
       setError(error.message);
+      return;
+    }
+    // If session exists (email confirmation disabled), user is logged in - go to onboarding
+    if (data.session) {
+      router.push("/onboarding");
+      router.refresh();
       return;
     }
     setSuccess(true);
@@ -36,8 +46,15 @@ export function SignUpForm() {
 
   if (success) {
     return (
-      <div className="p-4 rounded-lg bg-green-500/10 text-green-400 text-center">
-        Check your email to confirm your account, then sign in.
+      <div className="p-4 rounded-lg bg-green-500/10 text-green-400 text-center space-y-2">
+        <p>Check your email to confirm your account.</p>
+        <p className="text-sm">
+          After confirming, you&apos;ll be redirected to setup. Or{" "}
+          <Link href="/sign-in" className="underline hover:text-green-300">
+            sign in now
+          </Link>{" "}
+          if you&apos;ve already confirmed.
+        </p>
       </div>
     );
   }
