@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DnsRecordCard } from "./dns-record-card";
+import { DnsRecordsToAdd } from "@/components/dns-records-to-add";
 import { DomainReadinessSummary } from "@/components/domain-readiness-summary";
 import { evaluateDomainReadiness } from "@/lib/domain-readiness";
 
@@ -102,6 +103,13 @@ export function DomainVerificationStep({
       <DomainReadinessSummary
         readiness={readiness}
         domainName={domainName}
+      />
+
+      <DnsRecordsToAdd
+        domain={domainName}
+        spfStatus={spf}
+        dkimStatus={dkim}
+        dmarcStatus={dmarc}
       />
 
       <div className="grid gap-4 md:grid-cols-1">

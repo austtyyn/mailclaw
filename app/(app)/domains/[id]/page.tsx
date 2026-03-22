@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getOrCreateDefaultWorkspace } from "@/lib/auth";
 import { requireAuth } from "@/lib/auth";
 import { evaluateDomainReadiness } from "@/lib/domain-readiness";
+import { DnsRecordsToAdd } from "@/components/dns-records-to-add";
 import { VerifyButton } from "./verify-button";
 
 export default async function DomainDetailPage({
@@ -66,6 +67,13 @@ export default async function DomainDetailPage({
           )}
         </p>
       </div>
+
+      <DnsRecordsToAdd
+        domain={domain.domain}
+        spfStatus={domain.spf_status ?? "unknown"}
+        dkimStatus={domain.dkim_status ?? "unknown"}
+        dmarcStatus={domain.dmarc_status ?? "unknown"}
+      />
 
       <div className="grid md:grid-cols-2 gap-4">
         <div className="p-4 rounded-lg bg-slate-800/50 border border-slate-700">
