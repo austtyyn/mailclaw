@@ -28,17 +28,21 @@ export default async function OnboardingPage() {
       <div>
         <h1 className="text-2xl font-bold">Get your domain ready for sending</h1>
         <p className="text-slate-400 mt-1">
-          Follow these steps to set up your domain and mailbox. We'll guide you
-          through each one.
+          Follow these steps to set up your domain and mailbox. We&apos;ll guide
+          you through each one.
         </p>
       </div>
 
       <OnboardingProgress steps={state.steps} currentStepId={stepId} />
 
       <div className="rounded-lg border border-slate-700 bg-slate-800/30 p-6">
-        <h2 className="font-semibold mb-2">{currentStep?.title ?? "Next step"}</h2>
+        <h2 className="font-semibold mb-2">
+          {currentStep?.title ?? "Next step"}
+        </h2>
         {currentStep?.description && (
-          <p className="text-slate-400 text-sm mb-6">{currentStep.description}</p>
+          <p className="text-slate-400 text-sm mb-6">
+            {currentStep.description}
+          </p>
         )}
 
         {stepId === "add_domain" && (
@@ -54,8 +58,8 @@ export default async function OnboardingPage() {
                   <li>Add at least one mailbox</li>
                 </ol>
                 <p className="text-slate-400 text-sm">
-                  We'll explain each step in plain English. Let's start by adding
-                  your domain.
+                  We&apos;ll explain each step in plain English. Let&apos;s start
+                  by adding your domain.
                 </p>
               </div>
             )}
@@ -94,7 +98,8 @@ export default async function OnboardingPage() {
         {stepId === "complete" && (
           <div className="space-y-4">
             <p className="text-green-400 font-medium">
-              You're all set. Your domain is ready and you've added a mailbox.
+              You&apos;re all set. Your domain is ready and you&apos;ve added a
+              mailbox.
             </p>
             <p className="text-slate-400">
               You can now start warming up your mailbox and sending email. Head
