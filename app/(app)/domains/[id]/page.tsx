@@ -31,11 +31,11 @@ export default async function DomainDetailPage({
     dmarc_status: domain.dmarc_status,
     health_score: domain.health_score,
   });
-  const issues = Array.isArray(domain.verification_issues)
-    ? domain.verification_issues
+  const issues: string[] = Array.isArray(domain.verification_issues)
+    ? (domain.verification_issues as string[])
     : [];
-  const recommendations = Array.isArray(domain.verification_recommendations)
-    ? domain.verification_recommendations
+  const recommendations: string[] = Array.isArray(domain.verification_recommendations)
+    ? (domain.verification_recommendations as string[])
     : [];
 
   const { data: mailboxes } = await supabase
